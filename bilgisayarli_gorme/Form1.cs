@@ -25,6 +25,8 @@ namespace bilgisayarli_gorme
             comboBox1.Items.Add("Gri Yap");
             comboBox1.Items.Add("Y ile Gri Yap");
             comboBox1.Items.Add("K-Means Intensity");
+            comboBox1.Items.Add("Sobel Kenar Bulma");
+            comboBox1.Items.Add("Histogram");
             comboBox1.SelectedIndex = 0;
 
             // ComboBox2'ye tepe değerlerini ekle
@@ -339,6 +341,142 @@ namespace bilgisayarli_gorme
         }
 
         //******************************************
+        //*         SOBEL KENAR BULMA            //*
+        //******************************************
+        private void SobelKenarBulma()
+        {
+            if (pictureBox1.Image == null) return;
+
+            Bitmap kaynak = new Bitmap(pictureBox1.Image);
+            Bitmap hedef = new Bitmap(kaynak.Width, kaynak.Height);
+
+            // Sobel operatörleri
+            int[,] Gx = new int[,] { { -1, 0, 1 }, { -2, 0, 2 }, { -1, 0, 1 } };
+            int[,] Gy = new int[,] { { -1, -2, -1 }, { 0, 0, 0 }, { 1, 2, 1 } };
+
+            // Önce gri tonlamaya çevir
+            int[,] griResim = new int[kaynak.Width, kaynak.Height];
+            int[,] kenarlar = new int[kaynak.Width, kaynak.Height];
+
+            // Resmi gri tonlamaya çevir
+            for (int x = 0; x < kaynak.Width; x++)
+            {
+                for (int y = 0; y < kaynak.Height; y++)
+                {
+                    Color piksel = kaynak.GetPixel(x, y);
+                    griResim[x, y] = (piksel.R + piksel.G + piksel.B) / 3;
+                }
+            }
+
+            // Sobel operatörünü uygula
+            for (int x = 1; x < kaynak.Width - 1; x++)
+            {
+                for (int y = 1; y < kaynak.Height - 1; y++)
+                {
+                    int px = 0, py = 0;
+
+                    // 3x3 komşuluk için Gx ve Gy'yi uygula
+                    for (int i = -1; i <= 1; i++)
+                    {
+                        for (int j = -1; j <= 1; j++)
+                        {
+                            px += griResim[x + i, y + j] * Gx[i + 1, j + 1];
+                            py += griResim[x + i, y + j] * Gy[i + 1, j + 1];
+                        }
+                    }
+
+                    // Gradyan büyüklüğünü hesapla
+                    int gradyan = (int)Math.Sqrt(px * px + py * py);
+                    
+                    // 255'e normalize et
+                    gradyan = Math.Min(255, gradyan);
+                    
+                    kenarlar[x, y] = gradyan;
+                }
+            }
+
+            // Sonucu Bitmap'e aktar
+            for (int x = 0; x < kaynak.Width; x++)
+            {
+                for (int y = 0; y < kaynak.Height; y++)
+                {
+                    int kenarDegeri = x == 0 || y == 0 || x == kaynak.Width - 1 || y == kaynak.Height - 1 ? 0 : kenarlar[x, y];
+                    Color yeniPiksel = Color.FromArgb(255, kenarDegeri, kenarDegeri, kenarDegeri);
+                    hedef.SetPixel(x, y, yeniPiksel);
+                }
+            }
+
+            if (pictureBox2.Image != null)
+            {
+                pictureBox2.Image.Dispose();
+            }
+            pictureBox2.Image = hedef;
+            pictureBox2.SizeMode = PictureBoxSizeMode.Zoom;
+        }
+
+        //******************************************
+        //*         HISTOGRAM ÇİZME               //*
+        //******************************************
+        private void HistogramCizme()
+        {
+            if (pictureBox1.Image == null) return;
+
+            Bitmap kaynak = new Bitmap(pictureBox1.Image);
+            Bitmap hedef = new Bitmap(kaynak.Width, kaynak.Height);
+            
+            // Gri tonlama değerlerini al
+            List<int> griDegerler = new List<int>();
+            for (int x = 0; x < kaynak.Width; x++)
+            {
+                for (int y = 0; y < kaynak.Height; y++)
+                {
+                    Color piksel = kaynak.GetPixel(x, y);
+                    int griDeger = (piksel.R + piksel.G + piksel.B) / 3;
+                    griDegerler.Add(griDeger);
+                    
+                    // Gri görüntüyü de oluştur
+                    Color yeniPiksel = Color.FromArgb(piksel.A, griDeger, griDeger, griDeger);
+                    hedef.SetPixel(x, y, yeniPiksel);
+                }
+            }
+
+            // Histogram verilerini hazırla
+            int[] histogram = new int[256];
+            foreach (int deger in griDegerler)
+            {
+                histogram[deger]++;
+            }
+
+            // Chart'ı temizle ve ayarla
+            chart1.Series.Clear();
+            chart1.ChartAreas[0].AxisX.Minimum = 0;
+            chart1.ChartAreas[0].AxisX.Maximum = 255;
+            chart1.ChartAreas[0].AxisX.Title = "Gri Seviye";
+            chart1.ChartAreas[0].AxisY.Title = "Piksel Sayısı";
+
+            // Histogram serisini ekle
+            var histogramSeries = new System.Windows.Forms.DataVisualization.Charting.Series();
+            histogramSeries.ChartType = System.Windows.Forms.DataVisualization.Charting.SeriesChartType.Column;
+            histogramSeries.Color = Color.Gray;
+            histogramSeries.Name = "Histogram";
+
+            // Histogram verilerini ekle
+            for (int i = 0; i < 256; i++)
+            {
+                histogramSeries.Points.AddXY(i, histogram[i]);
+            }
+            chart1.Series.Add(histogramSeries);
+
+            // Gri görüntüyü göster
+            if (pictureBox2.Image != null)
+            {
+                pictureBox2.Image.Dispose();
+            }
+            pictureBox2.Image = hedef;
+            pictureBox2.SizeMode = PictureBoxSizeMode.Zoom;
+        }
+
+        //******************************************
         //*         İŞLEM BAŞLATMA BÖLÜMÜ        //*
         //******************************************
         private void button2_Click(object sender, EventArgs e)
@@ -361,6 +499,12 @@ namespace bilgisayarli_gorme
                         break;
                     case "K-Means Intensity":
                         KMeansIntensity();
+                        break;
+                    case "Sobel Kenar Bulma":
+                        SobelKenarBulma();
+                        break;
+                    case "Histogram":
+                        HistogramCizme();
                         break;
                 }
             }
