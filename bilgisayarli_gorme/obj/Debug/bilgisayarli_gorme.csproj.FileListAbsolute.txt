@@ -1,0 +1,10 @@
+C:\project\bilgisayarli_gorme\bilgisayarli_gorme\bin\Debug\bilgisayarli_gorme.exe.config
+C:\project\bilgisayarli_gorme\bilgisayarli_gorme\bin\Debug\bilgisayarli_gorme.exe
+C:\project\bilgisayarli_gorme\bilgisayarli_gorme\bin\Debug\bilgisayarli_gorme.pdb
+C:\project\bilgisayarli_gorme\bilgisayarli_gorme\obj\Debug\bilgisayarli_gorme.csproj.AssemblyReference.cache
+C:\project\bilgisayarli_gorme\bilgisayarli_gorme\obj\Debug\bilgisayarli_gorme.Form1.resources
+C:\project\bilgisayarli_gorme\bilgisayarli_gorme\obj\Debug\bilgisayarli_gorme.Properties.Resources.resources
+C:\project\bilgisayarli_gorme\bilgisayarli_gorme\obj\Debug\bilgisayarli_gorme.csproj.GenerateResource.cache
+C:\project\bilgisayarli_gorme\bilgisayarli_gorme\obj\Debug\bilgisayarli_gorme.csproj.CoreCompileInputs.cache
+C:\project\bilgisayarli_gorme\bilgisayarli_gorme\obj\Debug\bilgisayarli_gorme.exe
+C:\project\bilgisayarli_gorme\bilgisayarli_gorme\obj\Debug\bilgisayarli_gorme.pdb
