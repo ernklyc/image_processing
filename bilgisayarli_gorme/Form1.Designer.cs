@@ -47,9 +47,14 @@
             this.label7 = new System.Windows.Forms.Label();
             this.label8 = new System.Windows.Forms.Label();
             this.listBox2 = new System.Windows.Forms.ListBox();
+            this.trackBar1 = new System.Windows.Forms.TrackBar();
+            this.labelThreshold = new System.Windows.Forms.Label();
+            this.trackBar2 = new System.Windows.Forms.TrackBar();
+            this.labelThreshold2 = new System.Windows.Forms.Label();
             ((System.ComponentModel.ISupportInitialize)(this.pictureBox1)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.pictureBox2)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.chart1)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.trackBar2)).BeginInit();
             this.SuspendLayout();
             // 
             // pictureBox1
@@ -262,6 +267,52 @@
             this.listBox2.Size = new System.Drawing.Size(250, 259);
             this.listBox2.TabIndex = 17;
             // 
+            // trackBar1
+            // 
+            this.trackBar1.Location = new System.Drawing.Point(474, 230);
+            this.trackBar1.Maximum = 255;
+            this.trackBar1.Minimum = 0;
+            this.trackBar1.Name = "trackBar1";
+            this.trackBar1.Size = new System.Drawing.Size(162, 45);
+            this.trackBar1.TabIndex = 18;
+            this.trackBar1.Value = 128;
+            this.trackBar1.Visible = false;
+            this.trackBar1.ValueChanged += new System.EventHandler(this.trackBar1_ValueChanged);
+            // 
+            // labelThreshold
+            // 
+            this.labelThreshold.AutoSize = true;
+            this.labelThreshold.Font = new System.Drawing.Font("Segoe UI", 10F);
+            this.labelThreshold.Location = new System.Drawing.Point(474, 210);
+            this.labelThreshold.Name = "labelThreshold";
+            this.labelThreshold.Size = new System.Drawing.Size(100, 19);
+            this.labelThreshold.TabIndex = 19;
+            this.labelThreshold.Text = "Threshold: 128";
+            this.labelThreshold.Visible = false;
+            // 
+            // trackBar2
+            // 
+            this.trackBar2.Location = new System.Drawing.Point(474, 185);
+            this.trackBar2.Maximum = 255;
+            this.trackBar2.Minimum = 0;
+            this.trackBar2.Name = "trackBar2";
+            this.trackBar2.Size = new System.Drawing.Size(162, 45);
+            this.trackBar2.TabIndex = 20;
+            this.trackBar2.Value = 128;
+            this.trackBar2.Visible = false;
+            this.trackBar2.ValueChanged += new System.EventHandler(this.trackBar2_ValueChanged);
+            // 
+            // labelThreshold2
+            // 
+            this.labelThreshold2.AutoSize = true;
+            this.labelThreshold2.Font = new System.Drawing.Font("Segoe UI", 10F);
+            this.labelThreshold2.Location = new System.Drawing.Point(474, 165);
+            this.labelThreshold2.Name = "labelThreshold2";
+            this.labelThreshold2.Size = new System.Drawing.Size(100, 19);
+            this.labelThreshold2.TabIndex = 21;
+            this.labelThreshold2.Text = "Threshold: 128";
+            this.labelThreshold2.Visible = false;
+            // 
             // Form1
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 17F);
@@ -285,6 +336,10 @@
             this.Controls.Add(this.chart1);
             this.Controls.Add(this.pictureBox2);
             this.Controls.Add(this.pictureBox1);
+            this.Controls.Add(this.trackBar1);
+            this.Controls.Add(this.labelThreshold);
+            this.Controls.Add(this.trackBar2);
+            this.Controls.Add(this.labelThreshold2);
             this.Font = new System.Drawing.Font("Segoe UI Light", 9.75F);
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedSingle;
             this.MaximizeBox = false;
@@ -294,6 +349,7 @@
             ((System.ComponentModel.ISupportInitialize)(this.pictureBox1)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.pictureBox2)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.chart1)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.trackBar2)).EndInit();
             this.ResumeLayout(false);
             this.PerformLayout();
 
@@ -318,6 +374,10 @@
         private System.Windows.Forms.Label label7;
         private System.Windows.Forms.Label label8;
         private System.Windows.Forms.ListBox listBox2;
+        private System.Windows.Forms.TrackBar trackBar1;
+        private System.Windows.Forms.Label labelThreshold;
+        private System.Windows.Forms.TrackBar trackBar2;
+        private System.Windows.Forms.Label labelThreshold2;
     }
 }
 

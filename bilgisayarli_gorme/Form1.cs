@@ -38,8 +38,40 @@ namespace bilgisayarli_gorme
                 comboBox2.Items.Add(i.ToString());
             }
             comboBox2.SelectedIndex = 0;
+
+            // ComboBox1 seçim değişikliği eventi
+            comboBox1.SelectedIndexChanged += ComboBox1_SelectedIndexChanged;
         }
 
+        private void ComboBox1_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            // Sobel Kenar Bulma seçiliyse TrackBar2'yi göster, değilse gizle
+            bool sobelSecili = comboBox1.SelectedItem.ToString() == "Sobel Kenar Bulma";
+            
+            // Sobel seçiliyse
+            if (sobelSecili)
+            {
+                // TrackBar2'yi comboBox2'nin yerine koy
+                trackBar2.Location = comboBox2.Location;
+                trackBar2.Size = comboBox2.Size;
+                labelThreshold2.Location = new Point(trackBar2.Location.X, trackBar2.Location.Y - 20);
+                
+                // Kontrollerin görünürlüğünü ayarla
+                trackBar2.Visible = true;
+                labelThreshold2.Visible = true;
+                comboBox2.Visible = false;
+                
+                // Label'ı güncelle
+                labelThreshold2.Text = "Threshold: " + trackBar2.Value.ToString();
+            }
+            else
+            {
+                // Sobel seçili değilse comboBox2'yi göster, trackBar2'yi gizle
+                trackBar2.Visible = false;
+                labelThreshold2.Visible = false;
+                comboBox2.Visible = true;
+            }
+        }
 
         //******************************************
         //*         RESİM SEÇME BÖLÜMÜ           //*
@@ -359,7 +391,13 @@ namespace bilgisayarli_gorme
 
             // Önce gri tonlamaya çevir
             int[,] griResim = new int[kaynak.Width, kaynak.Height];
-            int[,] kenarlar = new int[kaynak.Width, kaynak.Height];
+            int[,] kenarlarX = new int[kaynak.Width, kaynak.Height]; // Dikey kenarlar için
+            int[,] kenarlarY = new int[kaynak.Width, kaynak.Height]; // Yatay kenarlar için
+            int[,] kenarlar = new int[kaynak.Width, kaynak.Height];  // Birleştirilmiş kenarlar için
+
+            // Threshold değerini trackBar2'den al
+            int threshold = trackBar2.Value;
+            labelThreshold2.Text = "Eşik Değeri: " + threshold.ToString();
 
             // Resmi gri tonlamaya çevir
             for (int x = 0; x < kaynak.Width; x++)
@@ -371,25 +409,52 @@ namespace bilgisayarli_gorme
                 }
             }
 
-            // Sobel operatörünü uygula
+            // Önce dikey kenarları bul (Gx)
             for (int x = 1; x < kaynak.Width - 1; x++)
             {
                 for (int y = 1; y < kaynak.Height - 1; y++)
                 {
-                    int px = 0, py = 0;
-
-                    // 3x3 komşuluk için Gx ve Gy'yi uygula
+                    int px = 0;
+                    // 3x3 komşuluk için Gx uygula
                     for (int i = -1; i <= 1; i++)
                     {
                         for (int j = -1; j <= 1; j++)
                         {
                             px += griResim[x + i, y + j] * Gx[i + 1, j + 1];
+                        }
+                    }
+                    kenarlarX[x, y] = Math.Abs(px);
+                }
+            }
+
+            // Sonra yatay kenarları bul (Gy)
+            for (int x = 1; x < kaynak.Width - 1; x++)
+            {
+                for (int y = 1; y < kaynak.Height - 1; y++)
+                {
+                    int py = 0;
+                    // 3x3 komşuluk için Gy uygula
+                    for (int i = -1; i <= 1; i++)
+                    {
+                        for (int j = -1; j <= 1; j++)
+                        {
                             py += griResim[x + i, y + j] * Gy[i + 1, j + 1];
                         }
                     }
+                    kenarlarY[x, y] = Math.Abs(py);
+                }
+            }
 
-                    // Gradyan büyüklüğünü hesapla
-                    int gradyan = (int)Math.Sqrt(px * px + py * py);
+            // Dikey ve yatay kenarları birleştir
+            for (int x = 1; x < kaynak.Width - 1; x++)
+            {
+                for (int y = 1; y < kaynak.Height - 1; y++)
+                {
+                    // Dikey ve yatay kenarları topla
+                    int gradyan = kenarlarX[x, y] + kenarlarY[x, y];
+                    
+                    // Threshold uygula
+                    gradyan = gradyan > threshold ? 255 : 0;
                     
                     // 255'e normalize et
                     gradyan = Math.Min(255, gradyan);
@@ -415,6 +480,14 @@ namespace bilgisayarli_gorme
             }
             pictureBox2.Image = hedef;
             pictureBox2.SizeMode = PictureBoxSizeMode.Zoom;
+        }
+
+        private void trackBar2_ValueChanged(object sender, EventArgs e)
+        {
+            if (comboBox1.SelectedItem.ToString() == "Sobel Kenar Bulma")
+            {
+                SobelKenarBulma();
+            }
         }
 
         //******************************************
@@ -509,7 +582,7 @@ namespace bilgisayarli_gorme
             Bitmap kaynak = new Bitmap(pictureBox1.Image);
             Bitmap hedef = new Bitmap(kaynak.Width, kaynak.Height);
 
-            // RGB noktalarını al
+            // 1. Adım: RGB noktalarını diziye al
             List<RGBPoint> noktalar = new List<RGBPoint>();
             for (int x = 0; x < kaynak.Width; x++)
             {
@@ -524,17 +597,25 @@ namespace bilgisayarli_gorme
             int k = int.Parse(comboBox2.SelectedItem.ToString());
             label8.Text = k.ToString();
 
-            // Başlangıç merkezlerini rastgele seç
+            // 2. Adım: Küme merkezlerini rastgele seç
             Random rnd = new Random();
             List<RGBPoint> merkezler = new List<RGBPoint>();
-            for (int i = 0; i < k; i++)
+            HashSet<string> secilenRenkler = new HashSet<string>();
+            
+            while (merkezler.Count < k)
             {
                 int rastgeleIndex = rnd.Next(noktalar.Count);
                 RGBPoint merkez = noktalar[rastgeleIndex];
-                merkezler.Add(new RGBPoint(merkez.R, merkez.G, merkez.B));
+                string renkKodu = $"{merkez.R},{merkez.G},{merkez.B}";
+                
+                if (!secilenRenkler.Contains(renkKodu))
+                {
+                    secilenRenkler.Add(renkKodu);
+                    merkezler.Add(new RGBPoint(merkez.R, merkez.G, merkez.B));
+                }
             }
 
-            // ListView2'yi hazırla ve başlangıç değerlerini göster
+            // ListView2'yi hazırla
             listView2.Clear();
             listView2.Columns.Add("T", 50);
             listView2.Columns.Add("R", 50);
@@ -555,38 +636,50 @@ namespace bilgisayarli_gorme
             int maxIterasyon = 100;
             int iterasyon = 0;
             Dictionary<int, List<RGBPoint>> kümeler = new Dictionary<int, List<RGBPoint>>();
+            int[] etiketler = new int[noktalar.Count];
 
             do
             {
                 değişimVar = false;
-
-                // Kümeleri temizle
                 kümeler.Clear();
                 for (int i = 0; i < k; i++)
                 {
                     kümeler[i] = new List<RGBPoint>();
                 }
 
-                // Her noktayı en yakın kümeye ata
-                foreach (var nokta in noktalar)
+                // 3-4. Adım: Her piksel için uzaklıkları hesapla ve en yakın kümeye etiketle
+                for (int i = 0; i < noktalar.Count; i++)
                 {
-                    int enYakınKüme = 0;
-                    double enKüçükUzaklık = nokta.Distance(merkezler[0]);
-
-                    for (int i = 1; i < k; i++)
+                    var nokta = noktalar[i];
+                    double[] uzaklıklar = new double[k];  // Her kümeye olan uzaklıkları tut
+                    
+                    // Her küme için uzaklık hesapla
+                    for (int j = 0; j < k; j++)
                     {
-                        double uzaklık = nokta.Distance(merkezler[i]);
-                        if (uzaklık < enKüçükUzaklık)
+                        uzaklıklar[j] = Math.Sqrt(
+                            Math.Pow(nokta.R - merkezler[j].R, 2) +
+                            Math.Pow(nokta.G - merkezler[j].G, 2) +
+                            Math.Pow(nokta.B - merkezler[j].B, 2)
+                        );
+                    }
+
+                    // En küçük uzaklığı bul ve etiketle
+                    int enYakınKüme = 0;
+                    double enKüçükUzaklık = uzaklıklar[0];
+                    for (int j = 1; j < k; j++)
+                    {
+                        if (uzaklıklar[j] < enKüçükUzaklık)
                         {
-                            enKüçükUzaklık = uzaklık;
-                            enYakınKüme = i;
+                            enKüçükUzaklık = uzaklıklar[j];
+                            enYakınKüme = j;
                         }
                     }
 
+                    etiketler[i] = enYakınKüme;
                     kümeler[enYakınKüme].Add(nokta);
                 }
 
-                // Yeni merkez noktalarını hesapla
+                // 5. Adım: Küme merkezlerini güncelle
                 for (int i = 0; i < k; i++)
                 {
                     if (kümeler[i].Count > 0)
@@ -606,7 +699,7 @@ namespace bilgisayarli_gorme
                 iterasyon++;
                 label4.Text = iterasyon.ToString();
 
-            } while (değişimVar && iterasyon < maxIterasyon);
+            } while (değişimVar && iterasyon < maxIterasyon); // 6. Adım: 3'e geri dön
 
             // Toplam piksel sayısını göster
             label6.Text = noktalar.Count.ToString();
@@ -618,36 +711,22 @@ namespace bilgisayarli_gorme
                 listBox2.Items.Add($"{kümeler[i].Count}px T{i + 1}=({merkezler[i].R},{merkezler[i].G},{merkezler[i].B})");
             }
 
-            // Görüntüyü güncelle
+            // 7. Adım: Etiketlere göre renklendirme yap
+            int pikselIndex = 0;
             for (int x = 0; x < kaynak.Width; x++)
             {
                 for (int y = 0; y < kaynak.Height; y++)
                 {
                     Color piksel = kaynak.GetPixel(x, y);
-                    RGBPoint nokta = new RGBPoint(piksel.R, piksel.G, piksel.B);
-
-                    // En yakın merkezi bul
-                    int enYakınKüme = 0;
-                    double enKüçükUzaklık = nokta.Distance(merkezler[0]);
-
-                    for (int i = 1; i < k; i++)
-                    {
-                        double uzaklık = nokta.Distance(merkezler[i]);
-                        if (uzaklık < enKüçükUzaklık)
-                        {
-                            enKüçükUzaklık = uzaklık;
-                            enYakınKüme = i;
-                        }
-                    }
-
-                    // Pikseli en yakın merkezin rengiyle boya
+                    int kumeNo = etiketler[pikselIndex];
                     Color yeniPiksel = Color.FromArgb(
                         piksel.A,
-                        merkezler[enYakınKüme].R,
-                        merkezler[enYakınKüme].G,
-                        merkezler[enYakınKüme].B
+                        merkezler[kumeNo].R,
+                        merkezler[kumeNo].G,
+                        merkezler[kumeNo].B
                     );
                     hedef.SetPixel(x, y, yeniPiksel);
+                    pikselIndex++;
                 }
             }
 
@@ -658,20 +737,18 @@ namespace bilgisayarli_gorme
             pictureBox2.Image = hedef;
             pictureBox2.SizeMode = PictureBoxSizeMode.Zoom;
 
-            // Histogram için gri değerleri hesapla ve göster
+            // Histogram güncelleme
             chart1.Series.Clear();
             chart1.ChartAreas[0].AxisX.Minimum = 0;
             chart1.ChartAreas[0].AxisX.Maximum = 255;
             chart1.ChartAreas[0].AxisX.Title = "Gri Seviye";
             chart1.ChartAreas[0].AxisY.Title = "Piksel Sayısı";
 
-            // Histogram serisi
             var histogramSeries = new System.Windows.Forms.DataVisualization.Charting.Series();
             histogramSeries.ChartType = System.Windows.Forms.DataVisualization.Charting.SeriesChartType.Column;
             histogramSeries.Color = Color.Gray;
             histogramSeries.Name = "Histogram";
 
-            // Histogram verilerini hazırla
             int[] histogram = new int[256];
             foreach (var nokta in noktalar)
             {
@@ -679,14 +756,12 @@ namespace bilgisayarli_gorme
                 histogram[griDeger]++;
             }
 
-            // Verileri ekle
             for (int i = 0; i < 256; i++)
             {
                 histogramSeries.Points.AddXY(i, histogram[i]);
             }
             chart1.Series.Add(histogramSeries);
 
-            // Merkez noktalarını işaretle
             var merkezSeries = new System.Windows.Forms.DataVisualization.Charting.Series();
             merkezSeries.ChartType = System.Windows.Forms.DataVisualization.Charting.SeriesChartType.Point;
             merkezSeries.Color = Color.Red;
@@ -788,6 +863,7 @@ namespace bilgisayarli_gorme
                             enKüçükUzaklık = uzaklık;
                             enYakınKüme = i;
                         }
+
                     }
 
                     kümeler[enYakınKüme].Add(griDeger);
@@ -989,7 +1065,7 @@ namespace bilgisayarli_gorme
             Bitmap kaynak = new Bitmap(pictureBox1.Image);
             Bitmap hedef = new Bitmap(kaynak.Width, kaynak.Height);
 
-            // RGB noktalarını al
+            // 1. Adım: Resmin her bir pikselinin R,G,B değerleri bir diziye alınacak
             List<RGBPoint3D> noktalar = new List<RGBPoint3D>();
             for (int x = 0; x < kaynak.Width; x++)
             {
@@ -1000,31 +1076,37 @@ namespace bilgisayarli_gorme
                 }
             }
 
-            // Kovaryans matrisini hesapla
-            double[,] kovaryans = HesaplaKovaryansMatrisi(noktalar);
-            double[,] invKovaryans = MatrisInverse(kovaryans);
+            // Toplam piksel sayısını göster
+            label6.Text = noktalar.Count.ToString();
 
-            // K değerini al
+            // 2. Adım: Kaç adet küme oluşturulacak ise her bir küme için küme merkezi olan Rk,Gk,Bk rastgele alınacak
             int k = int.Parse(comboBox2.SelectedItem.ToString());
             label8.Text = k.ToString();
-
-            // Başlangıç merkezlerini rastgele seç
+            
             Random rnd = new Random();
             List<RGBPoint3D> merkezler = new List<RGBPoint3D>();
-            for (int i = 0; i < k; i++)
+            HashSet<string> secilenRenkler = new HashSet<string>();
+            
+            while (merkezler.Count < k)
             {
                 int rastgeleIndex = rnd.Next(noktalar.Count);
                 var nokta = noktalar[rastgeleIndex];
-                merkezler.Add(new RGBPoint3D(nokta.Values[0], nokta.Values[1], nokta.Values[2]));
+                string renkKodu = $"{(int)nokta.Values[0]},{(int)nokta.Values[1]},{(int)nokta.Values[2]}";
+                
+                if (!secilenRenkler.Contains(renkKodu))
+                {
+                    secilenRenkler.Add(renkKodu);
+                    merkezler.Add(new RGBPoint3D(nokta.Values[0], nokta.Values[1], nokta.Values[2]));
+                }
             }
 
-            // ListView2'yi hazırla
+            // ListView2'yi hazırla ve başlangıç değerlerini göster
             listView2.Clear();
             listView2.Columns.Add("T", 50);
             listView2.Columns.Add("R", 50);
             listView2.Columns.Add("G", 50);
             listView2.Columns.Add("B", 50);
-
+            
             for (int i = 0; i < k; i++)
             {
                 ListViewItem item = new ListViewItem($"T{i + 1}");
@@ -1034,49 +1116,94 @@ namespace bilgisayarli_gorme
                 listView2.Items.Add(item);
             }
 
-            // K-means iterasyonları
             bool değişimVar;
             int maxIterasyon = 100;
             int iterasyon = 0;
-            Dictionary<int, List<RGBPoint3D>> kümeler = new Dictionary<int, List<RGBPoint3D>>();
+            int[] etiketler = new int[noktalar.Count];
+            double[] uzakliklar = new double[k];
+            List<double[,]> tersKovaryanslar = new List<double[,]>();
 
             do
             {
                 değişimVar = false;
-                kümeler.Clear();
-                for (int i = 0; i < k; i++)
+
+                // 3. Adım: Kovaryans matrisini hesapla (E(σ))
+                double[,] kovaryans = HesaplaKovaryansMatrisi(noktalar);
+
+                // Kovaryans matrisinin determinantını kontrol et
+                double det = kovaryans[0, 0] * (kovaryans[1, 1] * kovaryans[2, 2] - kovaryans[1, 2] * kovaryans[2, 1]) -
+                            kovaryans[0, 1] * (kovaryans[1, 0] * kovaryans[2, 2] - kovaryans[1, 2] * kovaryans[2, 0]) +
+                            kovaryans[0, 2] * (kovaryans[1, 0] * kovaryans[2, 1] - kovaryans[1, 1] * kovaryans[2, 0]);
+                
+                if (Math.Abs(det) < 1e-10)
                 {
-                    kümeler[i] = new List<RGBPoint3D>();
+                    MessageBox.Show("Kovaryans matrisi tekil (singular). İşlem durduruluyor.", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
                 }
 
-                // Her noktayı en yakın kümeye ata
-                foreach (var nokta in noktalar)
+                // 4. Adım: Her küme için kovaryans değerleri hesaplanır
+                tersKovaryanslar.Clear();
+                for (int i = 0; i < k; i++)
                 {
-                    int enYakınKüme = 0;
-                    double enKüçükUzaklık = MahalanobisUzaklik(nokta, merkezler[0], invKovaryans);
-
-                    for (int i = 1; i < k; i++)
+                    var kumedekiNoktalar = new List<RGBPoint3D>();
+                    for (int j = 0; j < noktalar.Count; j++)
                     {
-                        double uzaklık = MahalanobisUzaklik(nokta, merkezler[i], invKovaryans);
-                        if (uzaklık < enKüçükUzaklık)
+                        if (etiketler[j] == i)
                         {
-                            enKüçükUzaklık = uzaklık;
-                            enYakınKüme = i;
+                            kumedekiNoktalar.Add(noktalar[j]);
                         }
                     }
 
-                    kümeler[enYakınKüme].Add(nokta);
+                    if (kumedekiNoktalar.Count > 1)
+                    {
+                        var kumeKovaryans = HesaplaKovaryansMatrisi(kumedekiNoktalar);
+                        tersKovaryanslar.Add(MatrisInverse(kumeKovaryans));
+                    }
+                    else
+                    {
+                        // Eğer kümede yeterli nokta yoksa genel kovaryans matrisini kullan
+                        tersKovaryanslar.Add(MatrisInverse(kovaryans));
+                    }
                 }
 
-                // Yeni merkez noktalarını hesapla
+                // 5-6-7. Adım: Her piksel için Mahalanobis uzaklığını hesapla ve en yakın kümeye ata
+                for (int i = 0; i < noktalar.Count; i++)
+                {
+                    var nokta = noktalar[i];
+                    
+                    // Her küme için Mahalanobis uzaklığını hesapla
+                    for (int j = 0; j < k; j++)
+                    {
+                        uzakliklar[j] = MahalanobisUzaklik(nokta, merkezler[j], tersKovaryanslar[j]);
+                    }
+
+                    // En küçük uzaklığa sahip kümeyi bul ve etiketle
+                    int yeniEtiket = Array.IndexOf(uzakliklar, uzakliklar.Min());
+                    if (etiketler[i] != yeniEtiket)
+                    {
+                        etiketler[i] = yeniEtiket;
+                        değişimVar = true;
+                    }
+                }
+
+                // 8. Adım: Küme merkezlerini güncelle
                 for (int i = 0; i < k; i++)
                 {
-                    if (kümeler[i].Count > 0)
+                    var kumedekiNoktalar = new List<RGBPoint3D>();
+                    for (int j = 0; j < noktalar.Count; j++)
+                    {
+                        if (etiketler[j] == i)
+                        {
+                            kumedekiNoktalar.Add(noktalar[j]);
+                        }
+                    }
+
+                    if (kumedekiNoktalar.Count > 0)
                     {
                         double[] yeniMerkez = new double[3];
                         for (int j = 0; j < 3; j++)
                         {
-                            yeniMerkez[j] = kümeler[i].Average(p => p.Values[j]);
+                            yeniMerkez[j] = kumedekiNoktalar.Average(p => p.Values[j]);
                         }
 
                         if (Math.Abs(yeniMerkez[0] - merkezler[i].Values[0]) > 0.001 ||
@@ -1092,46 +1219,39 @@ namespace bilgisayarli_gorme
                 iterasyon++;
                 label4.Text = iterasyon.ToString();
 
-            } while (değişimVar && iterasyon < maxIterasyon);
-
-            // Toplam piksel sayısını göster
-            label6.Text = noktalar.Count.ToString();
+            } while (değişimVar && iterasyon < maxIterasyon); // 9. Adım: 3. adıma geri dön
 
             // Sonuçları listbox'a ekle
             listBox2.Items.Clear();
             for (int i = 0; i < k; i++)
             {
-                listBox2.Items.Add($"{kümeler[i].Count}px T{i + 1}=({(int)merkezler[i].Values[0]},{(int)merkezler[i].Values[1]},{(int)merkezler[i].Values[2]})");
+                int kumedekiNoktaSayisi = 0;
+                for (int j = 0; j < etiketler.Length; j++)
+                {
+                    if (etiketler[j] == i)
+                    {
+                        kumedekiNoktaSayisi++;
+                    }
+                }
+                listBox2.Items.Add($"{kumedekiNoktaSayisi}px T{i+1}=({(int)merkezler[i].Values[0]},{(int)merkezler[i].Values[1]},{(int)merkezler[i].Values[2]})");
             }
 
-            // Görüntüyü güncelle
+            // Son görüntüyü oluştur
+            int pikselIndex = 0;
             for (int x = 0; x < kaynak.Width; x++)
             {
                 for (int y = 0; y < kaynak.Height; y++)
                 {
                     Color piksel = kaynak.GetPixel(x, y);
-                    var nokta = new RGBPoint3D(piksel.R, piksel.G, piksel.B);
-
-                    int enYakınKüme = 0;
-                    double enKüçükUzaklık = MahalanobisUzaklik(nokta, merkezler[0], invKovaryans);
-
-                    for (int i = 1; i < k; i++)
-                    {
-                        double uzaklık = MahalanobisUzaklik(nokta, merkezler[i], invKovaryans);
-                        if (uzaklık < enKüçükUzaklık)
-                        {
-                            enKüçükUzaklık = uzaklık;
-                            enYakınKüme = i;
-                        }
-                    }
-
+                    int kumeNo = etiketler[pikselIndex];
                     Color yeniPiksel = Color.FromArgb(
                         piksel.A,
-                        (int)merkezler[enYakınKüme].Values[0],
-                        (int)merkezler[enYakınKüme].Values[1],
-                        (int)merkezler[enYakınKüme].Values[2]
+                        (int)merkezler[kumeNo].Values[0],
+                        (int)merkezler[kumeNo].Values[1],
+                        (int)merkezler[kumeNo].Values[2]
                     );
                     hedef.SetPixel(x, y, yeniPiksel);
+                    pikselIndex++;
                 }
             }
 
@@ -1142,7 +1262,7 @@ namespace bilgisayarli_gorme
             pictureBox2.Image = hedef;
             pictureBox2.SizeMode = PictureBoxSizeMode.Zoom;
 
-            // Histogram için gri değerleri hesapla ve göster
+            // Histogram güncelleme
             chart1.Series.Clear();
             chart1.ChartAreas[0].AxisX.Minimum = 0;
             chart1.ChartAreas[0].AxisX.Maximum = 255;
@@ -1234,5 +1354,12 @@ namespace bilgisayarli_gorme
                 MessageBox.Show("İşlem sırasında hata oluştu: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
+
+        private void trackBar1_ValueChanged(object sender, EventArgs e)
+        {
+            // TrackBar1 değeri değiştiğinde yapılacak işlemler
+            labelThreshold.Text = "Threshold: " + trackBar1.Value.ToString();
+        }
     }
 }
+
