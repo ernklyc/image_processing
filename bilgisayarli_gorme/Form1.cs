@@ -776,206 +776,6 @@ namespace bilgisayarli_gorme
             chart1.Series.Add(merkezSeries);
         }
 
-        //******************************************
-        //*     K-Means Mahalanobis İşlemi       //*
-        //******************************************
-        private void KMeansMahalanobis()
-        {
-            if (pictureBox1.Image == null) return;
-
-            Bitmap kaynak = new Bitmap(pictureBox1.Image);
-            Bitmap hedef = new Bitmap(kaynak.Width, kaynak.Height);
-            
-            // Gri tonlama değerlerini al
-            List<int> griDegerler = new List<int>();
-            for (int x = 0; x < kaynak.Width; x++)
-            {
-                for (int y = 0; y < kaynak.Height; y++)
-                {
-                    Color piksel = kaynak.GetPixel(x, y);
-                    int griDeger = (piksel.R + piksel.G + piksel.B) / 3;
-                    griDegerler.Add(griDeger);
-                }
-            }
-
-            // Varyans hesapla
-            double ortalama = griDegerler.Average();
-            double varyans = griDegerler.Sum(d => Math.Pow(d - ortalama, 2)) / griDegerler.Count;
-            
-            // K değerini al
-            int k = int.Parse(comboBox2.SelectedItem.ToString());
-            label8.Text = k.ToString();
-
-            // Başlangıç merkezlerini rastgele seç
-            Random rnd = new Random();
-            merkezler.Clear();
-            for (int i = 0; i < k; i++)
-            {
-                int rastgeleMerkez = griDegerler[rnd.Next(griDegerler.Count)];
-                merkezler.Add(rastgeleMerkez);
-            }
-
-            // ListView2'yi hazırla ve başlangıç değerlerini göster
-            listView2.Clear();
-            listView2.Columns.Add("T", 50);
-            listView2.Columns.Add("Değer", 100);
-            
-            var sıraliBaslangicDegerler = merkezler.Select((deger, index) => new { Deger = deger, Index = index })
-                                         .OrderBy(x => x.Deger)
-                                         .ToList();
-
-            foreach (var merkez in sıraliBaslangicDegerler)
-            {
-                ListViewItem item = new ListViewItem($"T{merkez.Index + 1}");
-                item.SubItems.Add(merkez.Deger.ToString());
-                listView2.Items.Add(item);
-            }
-
-            // K-means iterasyonları
-            bool değişimVar;
-            int maxIterasyon = 100;
-            int iterasyon = 0;
-            Dictionary<int, List<int>> kümeler = new Dictionary<int, List<int>>();
-
-            do
-            {
-                değişimVar = false;
-                
-                // Kümeleri temizle
-                kümeler.Clear();
-                for (int i = 0; i < k; i++)
-                {
-                    kümeler[i] = new List<int>();
-                }
-
-                // Her pikseli en yakın kümeye ata (Mahalanobis mesafesi kullanarak)
-                foreach (int griDeger in griDegerler)
-                {
-                    int enYakınKüme = 0;
-                    double enKüçükUzaklık = double.MaxValue;
-
-                    for (int i = 0; i < k; i++)
-                    {
-                        // Mahalanobis mesafesi: |x-y| / √varyans
-                        double uzaklık = Math.Abs(griDeger - merkezler[i]) / Math.Sqrt(varyans);
-                        if (uzaklık < enKüçükUzaklık)
-                        {
-                            enKüçükUzaklık = uzaklık;
-                            enYakınKüme = i;
-                        }
-
-                    }
-
-                    kümeler[enYakınKüme].Add(griDeger);
-                }
-
-                // Yeni merkez noktalarını hesapla
-                for (int i = 0; i < k; i++)
-                {
-                    if (kümeler[i].Count > 0)
-                    {
-                        int yeniMerkez = (int)kümeler[i].Average();
-                        if (yeniMerkez != merkezler[i])
-                        {
-                            değişimVar = true;
-                            merkezler[i] = yeniMerkez;
-                        }
-                    }
-                }
-
-                iterasyon++;
-                label4.Text = iterasyon.ToString();
-
-            } while (değişimVar && iterasyon < maxIterasyon);
-
-            // Toplam piksel sayısını göster
-            label6.Text = griDegerler.Count.ToString();
-
-            // Sonuçları listbox'a ekle
-            listBox2.Items.Clear();
-            var sıraliMerkezler = merkezler.Select((deger, index) => new { Deger = deger, Index = index })
-                                 .OrderBy(x => x.Deger)
-                                 .ToList();
-
-            foreach (var merkez in sıraliMerkezler)
-            {
-                listBox2.Items.Add($"{kümeler[merkez.Index].Count}px T{merkez.Index + 1}={merkez.Deger} ({merkez.Deger},{merkez.Deger},{merkez.Deger})");
-            }
-
-            // Görüntüyü güncelle
-            for (int x = 0; x < kaynak.Width; x++)
-            {
-                for (int y = 0; y < kaynak.Height; y++)
-                {
-                    Color piksel = kaynak.GetPixel(x, y);
-                    int griDeger = (piksel.R + piksel.G + piksel.B) / 3;
-                    
-                    // En yakın merkezi bul (Mahalanobis mesafesi kullanarak)
-                    int enYakınMerkez = merkezler[0];
-                    double enKüçükUzaklık = Math.Abs(griDeger - merkezler[0]) / Math.Sqrt(varyans);
-
-                    for (int i = 1; i < k; i++)
-                    {
-                        double uzaklık = Math.Abs(griDeger - merkezler[i]) / Math.Sqrt(varyans);
-                        if (uzaklık < enKüçükUzaklık)
-                        {
-                            enKüçükUzaklık = uzaklık;
-                            enYakınMerkez = merkezler[i];
-                        }
-                    }
-
-                    Color yeniPiksel = Color.FromArgb(piksel.A, enYakınMerkez, enYakınMerkez, enYakınMerkez);
-                    hedef.SetPixel(x, y, yeniPiksel);
-                }
-            }
-
-            if (pictureBox2.Image != null)
-            {
-                pictureBox2.Image.Dispose();
-            }
-            pictureBox2.Image = hedef;
-            pictureBox2.SizeMode = PictureBoxSizeMode.Zoom;
-
-            // Histogram çiz
-            chart1.Series.Clear();
-            chart1.ChartAreas[0].AxisX.Minimum = 0;
-            chart1.ChartAreas[0].AxisX.Maximum = 255;
-            chart1.ChartAreas[0].AxisX.Title = "Gri Seviye";
-            chart1.ChartAreas[0].AxisY.Title = "Piksel Sayısı";
-
-            var histogramSeries = new System.Windows.Forms.DataVisualization.Charting.Series();
-            histogramSeries.ChartType = System.Windows.Forms.DataVisualization.Charting.SeriesChartType.Column;
-            histogramSeries.Color = Color.Gray;
-            histogramSeries.Name = "Histogram";
-
-            // Histogram verilerini hazırla
-            int[] histogram = new int[256];
-            foreach (int deger in griDegerler)
-            {
-                histogram[deger]++;
-            }
-
-            // Verileri ekle
-            for (int i = 0; i < 256; i++)
-            {
-                histogramSeries.Points.AddXY(i, histogram[i]);
-            }
-            chart1.Series.Add(histogramSeries);
-
-            // Merkez noktalarını işaretle
-            var tepeSeries = new System.Windows.Forms.DataVisualization.Charting.Series();
-            tepeSeries.ChartType = System.Windows.Forms.DataVisualization.Charting.SeriesChartType.Point;
-            tepeSeries.Color = Color.Red;
-            tepeSeries.Name = "Tepe Noktaları";
-            tepeSeries.MarkerStyle = System.Windows.Forms.DataVisualization.Charting.MarkerStyle.Circle;
-            tepeSeries.MarkerSize = 10;
-
-            foreach (var merkez in merkezler.OrderBy(x => x))
-            {
-                tepeSeries.Points.AddXY(merkez, histogram[merkez]);
-            }
-            chart1.Series.Add(tepeSeries);
-        }
 
         //******************************************
         //*     K-Means Mahalanobis ND İşlemi    //*
@@ -1277,7 +1077,7 @@ namespace bilgisayarli_gorme
             int[] histogram = new int[256];
             foreach (var nokta in noktalar)
             {
-                int griDeger = (int)((nokta.Values[0] + nokta.Values[1] + nokta.Values[2]) / 3);
+                int griDeger = ((int)nokta.Values[0] + (int)nokta.Values[1] + (int)nokta.Values[2]) / 3;
                 histogram[griDeger]++;
             }
 
@@ -1295,10 +1095,243 @@ namespace bilgisayarli_gorme
 
             foreach (var merkez in merkezler)
             {
-                int griMerkez = (int)((merkez.Values[0] + merkez.Values[1] + merkez.Values[2]) / 3);
+                int griMerkez = ((int)merkez.Values[0] + (int)merkez.Values[1] + (int)merkez.Values[2]) / 3;
                 merkezSeries.Points.AddXY(griMerkez, histogram[griMerkez]);
             }
             chart1.Series.Add(merkezSeries);
+        }
+
+        //******************************************
+        //*         K-Means Mahalanobis İşlemi     //*
+        //******************************************
+        private void KMeansMahalanobis()
+        {
+            if (pictureBox1.Image == null) return;
+
+            try 
+            {
+                Bitmap kaynak = new Bitmap(pictureBox1.Image);
+                Bitmap hedef = new Bitmap(kaynak.Width, kaynak.Height);
+                
+                // Gri tonlama değerlerini al
+                List<int> griDegerler = new List<int>();
+                for (int x = 0; x < kaynak.Width; x++)
+                {
+                    for (int y = 0; y < kaynak.Height; y++)
+                    {
+                        Color piksel = kaynak.GetPixel(x, y);
+                        int griDeger = (piksel.R + piksel.G + piksel.B) / 3;
+                        griDegerler.Add(griDeger);
+                    }
+                }
+
+                // K değerini al
+                int k = int.Parse(comboBox2.SelectedItem.ToString());
+                if (k <= 0 || k > 10)
+                {
+                    MessageBox.Show("Geçerli bir K değeri seçin (1-10 arası)", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
+                
+                label8.Text = k.ToString();
+
+                // Başlangıç merkezlerini rastgele seç
+                Random rnd = new Random();
+                List<int> merkezler = new List<int>();
+                HashSet<int> secilenMerkezler = new HashSet<int>();
+                
+                while (merkezler.Count < k)
+                {
+                    int rastgeleMerkez = griDegerler[rnd.Next(griDegerler.Count)];
+                    if (!secilenMerkezler.Contains(rastgeleMerkez))
+                    {
+                        secilenMerkezler.Add(rastgeleMerkez);
+                        merkezler.Add(rastgeleMerkez);
+                    }
+                }
+
+                // ListView2'yi hazırla
+                listView2.Clear();
+                listView2.Columns.Add("T", 50);
+                listView2.Columns.Add("Değer", 100);
+                
+                var siraliBaslangicDegerler = merkezler.Select((deger, index) => new { Deger = deger, Index = index })
+                                                      .OrderBy(x => x.Deger)
+                                                      .ToList();
+
+                foreach (var merkez in siraliBaslangicDegerler)
+                {
+                    ListViewItem item = new ListViewItem($"T{merkez.Index + 1}");
+                    item.SubItems.Add(merkez.Deger.ToString());
+                    listView2.Items.Add(item);
+                }
+
+                // K-means iterasyonları
+                bool degisimVar;
+                int maxIterasyon = 100;
+                int iterasyon = 0;
+                Dictionary<int, List<int>> kumeler = new Dictionary<int, List<int>>();
+
+                do
+                {
+                    degisimVar = false;
+                    
+                    // Kümeleri temizle
+                    kumeler.Clear();
+                    for (int i = 0; i < k; i++)
+                    {
+                        kumeler[i] = new List<int>();
+                    }
+
+                    // Her kümenin varyansını hesapla
+                    Dictionary<int, double> kumeVaryanslari = new Dictionary<int, double>();
+                    for (int i = 0; i < k; i++)
+                    {
+                        if (kumeler[i].Count > 1)
+                        {
+                            double ortalama = kumeler[i].Average();
+                            kumeVaryanslari[i] = kumeler[i].Sum(x => Math.Pow(x - ortalama, 2)) / (kumeler[i].Count - 1);
+                        }
+                        else
+                        {
+                            kumeVaryanslari[i] = 1.0; // Başlangıç varyansı
+                        }
+                    }
+
+                    // Her pikseli en yakın kümeye ata
+                    foreach (int griDeger in griDegerler)
+                    {
+                        int enYakinKume = 0;
+                        double enKucukUzaklik = double.MaxValue;
+
+                        for (int i = 0; i < k; i++)
+                        {
+                            double varyans = kumeVaryanslari[i];
+                            if (varyans < 0.0001) varyans = 0.0001; // Çok küçük varyansları önle
+                            
+                            double uzaklik = Math.Abs(griDeger - merkezler[i]) / Math.Sqrt(varyans);
+                            if (uzaklik < enKucukUzaklik)
+                            {
+                                enKucukUzaklik = uzaklik;
+                                enYakinKume = i;
+                            }
+                        }
+
+                        kumeler[enYakinKume].Add(griDeger);
+                    }
+
+                    // Yeni merkez noktalarını hesapla
+                    for (int i = 0; i < k; i++)
+                    {
+                        if (kumeler[i].Count > 0)
+                        {
+                            int yeniMerkez = (int)kumeler[i].Average();
+                            if (Math.Abs(yeniMerkez - merkezler[i]) > 1)
+                            {
+                                degisimVar = true;
+                                merkezler[i] = yeniMerkez;
+                            }
+                        }
+                    }
+
+                    iterasyon++;
+                    label4.Text = iterasyon.ToString();
+
+                } while (degisimVar && iterasyon < maxIterasyon);
+
+                // Toplam piksel sayısını göster
+                label6.Text = griDegerler.Count.ToString();
+
+                // Sonuçları listbox'a ekle
+                listBox2.Items.Clear();
+                var siraliMerkezler = merkezler.Select((deger, index) => new { Deger = deger, Index = index })
+                                             .OrderBy(x => x.Deger)
+                                             .ToList();
+
+                foreach (var merkez in siraliMerkezler)
+                {
+                    int kumeIndex = merkez.Index;
+                    listBox2.Items.Add($"{kumeler[kumeIndex].Count}px T{kumeIndex + 1}={merkez.Deger} " +
+                                      $"({merkez.Deger},{merkez.Deger},{merkez.Deger})");
+                }
+
+                // Görüntüyü güncelle
+                for (int x = 0; x < kaynak.Width; x++)
+                {
+                    for (int y = 0; y < kaynak.Height; y++)
+                    {
+                        Color piksel = kaynak.GetPixel(x, y);
+                        int griDeger = (piksel.R + piksel.G + piksel.B) / 3;
+                        
+                        int enYakinMerkez = merkezler[0];
+                        double enKucukUzaklik = double.MaxValue;
+
+                        for (int i = 0; i < k; i++)
+                        {
+                            double uzaklik = Math.Abs(griDeger - merkezler[i]);
+                            if (uzaklik < enKucukUzaklik)
+                            {
+                                enKucukUzaklik = uzaklik;
+                                enYakinMerkez = merkezler[i];
+                            }
+                        }
+
+                        Color yeniPiksel = Color.FromArgb(piksel.A, enYakinMerkez, enYakinMerkez, enYakinMerkez);
+                        hedef.SetPixel(x, y, yeniPiksel);
+                    }
+                }
+
+                if (pictureBox2.Image != null)
+                {
+                    pictureBox2.Image.Dispose();
+                }
+                pictureBox2.Image = hedef;
+                pictureBox2.SizeMode = PictureBoxSizeMode.Zoom;
+
+                // Histogram çiz
+                chart1.Series.Clear();
+                chart1.ChartAreas[0].AxisX.Minimum = 0;
+                chart1.ChartAreas[0].AxisX.Maximum = 255;
+                chart1.ChartAreas[0].AxisX.Title = "Gri Seviye";
+                chart1.ChartAreas[0].AxisY.Title = "Piksel Sayısı";
+
+                var histogramSeries = new System.Windows.Forms.DataVisualization.Charting.Series();
+                histogramSeries.ChartType = System.Windows.Forms.DataVisualization.Charting.SeriesChartType.Column;
+                histogramSeries.Color = Color.Gray;
+                histogramSeries.Name = "Histogram";
+
+                // Histogram verilerini hazırla
+                int[] histogram = new int[256];
+                foreach (int deger in griDegerler)
+                {
+                    histogram[deger]++;
+                }
+
+                // Verileri ekle
+                for (int i = 0; i < 256; i++)
+                {
+                    histogramSeries.Points.AddXY(i, histogram[i]);
+                }
+                chart1.Series.Add(histogramSeries);
+
+                // Merkez noktalarını işaretle
+                var tepeSeries = new System.Windows.Forms.DataVisualization.Charting.Series();
+                tepeSeries.ChartType = System.Windows.Forms.DataVisualization.Charting.SeriesChartType.Point;
+                tepeSeries.Color = Color.Red;
+                tepeSeries.Name = "Tepe Noktaları";
+                tepeSeries.MarkerStyle = System.Windows.Forms.DataVisualization.Charting.MarkerStyle.Circle;
+                tepeSeries.MarkerSize = 10;
+
+                foreach (var merkez in merkezler.OrderBy(x => x))
+                {
+                    tepeSeries.Points.AddXY(merkez, histogram[merkez]);
+                }
+                chart1.Series.Add(tepeSeries);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Hata oluştu: {ex.Message}", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         //******************************************
